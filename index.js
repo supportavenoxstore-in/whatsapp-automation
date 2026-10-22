@@ -16,22 +16,23 @@ http.createServer((req, res) => {
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// Initialize without polling to clear webhook/conflicts first
-const bot = new TelegramBot(token, { polling: false });
-
-async function initBot() {
-    try {
-        await bot.deleteWebHook();
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        
-        await bot.startPolling();
-        console.log("Telegram Bot listener started successfully!");
-    } catch (err) {
-        console.error("Bot initialization error:", err.message);
+const bot = new TelegramBot(token, {
+    polling: {
+        autoStart: true,
+        params: {
+            timeout: 10
+        }
     }
-}
+});
 
-initBot();
+bot.on("polling_error", (error) => {
+    // താൽക്കാലിക നെറ്റ്‌വർക്ക് പിഴവുകൾ അവഗണിച്ച് പ്രവർത്തനം തുടരുന്നു
+    if (error.code !== "EFATAL") {
+        console.log("Polling notice:", error.message);
+    }
+});
+
+console.log("Telegram Bot listener started successfully!");
 
 bot.on("message", async (msg) => {
     const chatId = msg.chat.id;
