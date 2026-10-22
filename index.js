@@ -1,16 +1,16 @@
-import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
+import makeWASocket, { useMultiFileAuthState, DisconnectReason, delay } from "@whiskeysockets/baileys";
 import http from "http";
 import dotenv from "dotenv";
 import pino from "pino";
 
 dotenv.config();
 
-// Dummy HTTP server to keep Render Free Web Service alive
-const PORT = process.env.PORT || 3000;
+// Keep Render Free Web Service alive
+const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("WhatsApp Bot is running!");
-}).listen(PORT, () => {
+    res.end("WhatsApp Bot is active and running!");
+}).listen(PORT, "0.0.0.0", () => {
     console.log(`Web server listening on port ${PORT}`);
 });
 
@@ -22,22 +22,22 @@ async function startBot() {
     const sock = makeWASocket({
         logger: pino({ level: "silent" }),
         auth: state,
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
     sock.ev.on("creds.update", saveCreds);
 
     if (!sock.authState.creds.registered) {
-        setTimeout(async () => {
-            try {
-                const code = await sock.requestPairingCode(PHONE_NUMBER);
-                console.log("\n=================================");
-                console.log(`YOUR NEW WHATSAPP PAIRING CODE IS: ${code}`);
-                console.log("=================================\n");
-            } catch (err) {
-                console.error("Pairing code error:", err);
-            }
-        }, 5000);
+        await delay(5000);
+        try {
+            const code = await sock.requestPairingCode(PHONE_NUMBER);
+            console.log("\n=================================");
+            console.log(`YOUR NEW PAIRING CODE IS: ${code}`);
+            console.log("=================================\n");
+        } catch (err) {
+            console.error("Pairing code error:", err);
+        }
     }
 
     sock.ev.on("connection.update", (update) => {
@@ -57,7 +57,7 @@ async function startBot() {
     sock.ev.on("messages.upsert", async (m) => {
         const msg = m.messages[0];
         if (!msg.key.fromMe && m.type === "notify") {
-            console.log("New message received:", msg.message?.conversation || msg.message?.extendedTextMessage?.text);
+            console.log("New message:", msg.message?.conversation || msg.message?.extendedTextMessage?.text);
         }
     });
 }
