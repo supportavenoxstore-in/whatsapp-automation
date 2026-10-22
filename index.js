@@ -32,9 +32,9 @@ bot.on("polling_error", (error) => {
 
 console.log("Telegram Bot listener started successfully!");
 
-// Gemini Direct API call function
+// Gemini Direct API call with the latest gemini-3.8-flash model
 async function generateProductDetails(text) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
     
     const body = {
         contents: [
