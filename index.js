@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Keep Render alive
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
@@ -16,7 +15,7 @@ http.createServer((req, res) => {
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 console.log("Telegram Bot listener started successfully!");
 
@@ -26,19 +25,23 @@ bot.on("message", async (msg) => {
 
     if (!text || text.startsWith("/")) return;
 
-    bot.sendMessage(chatId, "⏳ ഉൽപ്പന്ന വിവരങ്ങൾ പരിശോധിക്കുന്നു...");
+    bot.sendMessage(chatId, "⏳ ഉൽപ്പന്ന വിവരങ്ങൾ AI പരിശോധിക്കുന്നു...");
 
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const prompt = `Extract product details from this text and format neatly with Title, Description, Price, and Tags: "${text}"`;
+        const prompt = `You are a product listing expert for a Shopify store.
+Format the following supplier product message into a clean, professional product listing in Malayalam with proper titles, pricing in INR, description, and bullet points.
+
+Text:
+${text}`;
         
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const details = response.text();
 
-        bot.sendMessage(chatId, `🛍️ **ഉൽപ്പന്ന വിവരങ്ങൾ തയ്യാറാണ്:**\n\n${details}`);
+        bot.sendMessage(chatId, `🛍️ **തയ്യാറാക്കിയ ഉൽപ്പന്ന വിവരങ്ങൾ:**\n\n${details}`);
     } catch (error) {
-        console.error("Gemini Error:", error);
-        bot.sendMessage(chatId, "⚠️ വിവരങ്ങൾ പ്രോസസ്സ് ചെയ്യുന്നതിൽ തടസ്സം നേരിട്ടു.");
+        console.error("Gemini API Error Detail:", error);
+        bot.sendMessage(chatId, `⚠️ AI Error: ${error.message || "വിവരങ്ങൾ ലഭ്യമാക്കാൻ കഴിഞ്ഞില്ല"}`);
     }
 });
