@@ -32,7 +32,7 @@ bot.on("polling_error", (error) => {
 
 console.log("Telegram Bot listener started successfully!");
 
-// Fallback logic if one model faces high demand
+// Recommended Gemini 3.5 Flash Lite API call
 async function requestGemini(modelName, text) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
     const body = {
@@ -62,7 +62,8 @@ async function requestGemini(modelName, text) {
 }
 
 async function generateProductDetails(text) {
-    const modelsToTry = ["gemini-3.8-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+    // Priority to gemini-3.5-flash-lite as advised by Google API
+    const modelsToTry = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"];
     let lastError = null;
 
     for (const model of modelsToTry) {
