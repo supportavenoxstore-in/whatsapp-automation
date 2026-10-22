@@ -1,64 +1,45 @@
-import makeWASocket, { useMultiFileAuthState, DisconnectReason, delay, Browsers } from "@whiskeysockets/baileys";
+import TelegramBot from "node-telegram-bot-api";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import http from "http";
 import dotenv from "dotenv";
-import pino from "pino";
 
 dotenv.config();
 
+// Keep Render Free Instance alive
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("WhatsApp Bot Active");
+    res.end("Telegram Bot is running smoothly!");
 }).listen(PORT, "0.0.0.0", () => {
     console.log(`Server listening on port ${PORT}`);
 });
 
-const PHONE_NUMBER = "916282028031";
+const token = process.env.TELEGRAM_BOT_TOKEN;
+const bot = new TelegramBot(token, { polling: true });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState("auth_session");
+console.log("Telegram Bot listener started successfully!");
 
-    const sock = makeWASocket({
-        logger: pino({ level: "silent" }),
-        auth: state,
-        printQRInTerminal: false,
-        browser: Browsers.macOS("Desktop")
-    });
+bot.on("message", async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text || msg.caption;
 
-    sock.ev.on("creds.update", saveCreds);
+    // Ignore commands like /start
+    if (!text || text.startsWith("/")) return;
 
-    if (!sock.authState.creds.registered) {
-        await delay(4000);
-        try {
-            const code = await sock.requestPairingCode(PHONE_NUMBER);
-            console.log("\n=================================");
-            console.log(`NEW CODE: ${code}`);
-            console.log("=================================\n");
-        } catch (err) {
-            console.error("Pairing code error:", err);
-        }
+    bot.sendMessage(chatId, "⏳ ഉൽപ്പന്ന വിവരങ്ങൾ AI പരിശോധിക്കുന്നു...");
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `You are an eCommerce assistant for Shopify dropshipping. Extract product details from this text and provide Title, Description, Price, and Tags neatly formatted in Malayalam: "${text}"`;
+        
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const details = response.text();
+
+        bot.sendMessage(chatId, `🛍️ **ഉൽപ്പന്ന വിവരങ്ങൾ തയ്യാറാണ്:**\n\n${details}`);
+    } catch (error) {
+        console.error("Gemini Error:", error);
+        bot.sendMessage(chatId, "⚠️ വിവരങ്ങൾ പ്രോസസ്സ് ചെയ്യുന്നതിൽ തടസ്സം നേരിട്ടു.");
     }
-
-    sock.ev.on("connection.update", (update) => {
-        const { connection, lastDisconnect } = update;
-
-        if (connection === "close") {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log("Connection closed. Reconnecting:", shouldReconnect);
-            if (shouldReconnect) {
-                startBot();
-            }
-        } else if (connection === "open") {
-            console.log("\n>>> WhatsApp Automation connected successfully! <<<\n");
-        }
-    });
-
-    sock.ev.on("messages.upsert", async (m) => {
-        const msg = m.messages[0];
-        if (!msg.key.fromMe && m.type === "notify") {
-            console.log("Message received:", msg.message?.conversation || msg.message?.extendedTextMessage?.text);
-        }
-    });
-}
-
-startBot();
+});
