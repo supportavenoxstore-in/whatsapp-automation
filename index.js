@@ -32,10 +32,9 @@ bot.on("polling_error", (error) => {
 
 console.log("Telegram Bot listener started successfully!");
 
-// Gemini Direct API call with the latest gemini-3.8-flash model
-async function generateProductDetails(text) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
-    
+// Fallback logic if one model faces high demand
+async function requestGemini(modelName, text) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
     const body = {
         contents: [
             {
@@ -60,6 +59,22 @@ async function generateProductDetails(text) {
     }
 
     return data.candidates[0].content.parts[0].text;
+}
+
+async function generateProductDetails(text) {
+    const modelsToTry = ["gemini-3.8-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+    let lastError = null;
+
+    for (const model of modelsToTry) {
+        try {
+            return await requestGemini(model, text);
+        } catch (err) {
+            console.log(`Model ${model} busy/failed, trying next...`);
+            lastError = err;
+        }
+    }
+
+    throw lastError;
 }
 
 bot.on("message", async (msg) => {
