@@ -1,32 +1,34 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import qrcode from "qrcode-terminal";
 import dotenv from "dotenv";
 import pino from "pino";
 
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const PHONE_NUMBER = "91XXXXXXXXXX"; // <-- ഇവിടെ നിങ്ങളുടെ 10 അക്ക WhatsApp നമ്പർ 91 ചേർത്ത് നൽകുക
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
 
     const sock = makeWASocket({
         logger: pino({ level: "silent" }),
-        auth: state
+        auth: state,
+        printQRInTerminal: false
     });
 
     sock.ev.on("creds.update", saveCreds);
 
-    sock.ev.on("connection.update", (update) => {
-        const { connection, lastDisconnect, qr } = update;
-
-        if (qr) {
+    if (!sock.authState.creds.registered) {
+        setTimeout(async () => {
+            const code = await sock.requestPairingCode(PHONE_NUMBER);
             console.log("\n=================================");
-            console.log("SCAN THIS QR CODE IN WHATSAPP:");
+            console.log(`YOUR WHATSAPP PAIRING CODE IS: ${code}`);
             console.log("=================================\n");
-            qrcode.generate(qr, { small: true });
-        }
+        }, 3000);
+    }
+
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect } = update;
 
         if (connection === "close") {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
