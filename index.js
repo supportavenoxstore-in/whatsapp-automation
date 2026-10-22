@@ -1,61 +1,50 @@
+import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import pkg from "whatsapp-web.js";
-const { Client, LocalAuth } = pkg;
 import qrcode from "qrcode-terminal";
 import dotenv from "dotenv";
+import pino from "pino";
 
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    }
-});
 
-// Display QR Code for WhatsApp Web login
-client.on("qr", (qr) => {
-    qrcode.generate(qr, { small: true });
-    console.log("Scan this QR code to connect WhatsApp.");
-});
+async function startBot() {
+    const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
 
-// Logged in successfully
-client.on("ready", () => {
-    console.log("WhatsApp Automation connected successfully!");
-});
+    const sock = makeWASocket({
+        logger: pino({ level: "silent" }),
+        auth: state
+    });
 
-// Handle incoming messages
-client.on("message", async (msg) => {
-    const chat = await msg.getChat();
+    sock.ev.on("creds.update", saveCreds);
 
-    // 1. Process new products from reseller group
-    if (chat.isGroup && chat.name === process.env.WHATSAPP_GROUP_NAME) {
-        if (msg.hasMedia) {
-            console.log("New product detected in group. Processing for Shopify...");
-        }
-        return;
-    }
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect, qr } = update;
 
-    // 2. Handle private messages from supplier
-    if (!chat.isGroup && msg.from.includes(process.env.SUPPLIER_PHONE_NUMBER)) {
-        const text = msg.body.trim();
-
-        if (text.startsWith("TRACK")) {
-            console.log("Supplier provided tracking number. Updating Shopify fulfillment...");
-            msg.reply("Order fulfillment updated successfully.");
+        if (qr) {
+            console.log("\n=================================");
+            console.log("SCAN THIS QR CODE IN WHATSAPP:");
+            console.log("=================================\n");
+            qrcode.generate(qr, { small: true });
         }
 
-        if (text.startsWith("RETURN_TRACK")) {
-            console.log("Return tracking received. Notifying customer...");
-            msg.reply("Return pickup confirmed.");
+        if (connection === "close") {
+            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log("Connection closed. Reconnecting:", shouldReconnect);
+            if (shouldReconnect) {
+                startBot();
+            }
+        } else if (connection === "open") {
+            console.log("\n>>> WhatsApp Automation connected successfully! <<<\n");
         }
+    });
 
-        if (text.startsWith("OOS")) {
-            console.log("Product out of stock. Processing notice...");
-            msg.reply("Noted. Customer support will be contacted.");
+    sock.ev.on("messages.upsert", async (m) => {
+        const msg = m.messages[0];
+        if (!msg.key.fromMe && m.type === "notify") {
+            console.log("New message received:", msg.message?.conversation || msg.message?.extendedTextMessage?.text);
         }
-    }
-});
+    });
+}
 
-client.initialize();
+startBot();
