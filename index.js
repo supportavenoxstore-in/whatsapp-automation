@@ -26,7 +26,6 @@ const bot = new TelegramBot(token, {
 });
 
 bot.on("polling_error", (error) => {
-    // താൽക്കാലിക നെറ്റ്‌വർക്ക് പിഴവുകൾ അവഗണിച്ച് പ്രവർത്തനം തുടരുന്നു
     if (error.code !== "EFATAL") {
         console.log("Polling notice:", error.message);
     }
@@ -43,7 +42,8 @@ bot.on("message", async (msg) => {
     bot.sendMessage(chatId, "Analyzing product details with AI...");
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Using standard gemini-pro model to avoid 404 version mismatch
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const prompt = `You are a product listing assistant for a Shopify eCommerce store.
 Extract and structure the product information from the text below into a clean format with Title, Price (in INR), Description, and Bullet Points:
 
