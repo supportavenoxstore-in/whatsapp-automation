@@ -1,8 +1,18 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
+import http from "http";
 import dotenv from "dotenv";
 import pino from "pino";
 
 dotenv.config();
+
+// Dummy HTTP server to keep Render Free Web Service alive
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("WhatsApp Bot is running!");
+}).listen(PORT, () => {
+    console.log(`Web server listening on port ${PORT}`);
+});
 
 const PHONE_NUMBER = "916282028031";
 
@@ -22,12 +32,12 @@ async function startBot() {
             try {
                 const code = await sock.requestPairingCode(PHONE_NUMBER);
                 console.log("\n=================================");
-                console.log(`YOUR WHATSAPP PAIRING CODE IS: ${code}`);
+                console.log(`YOUR NEW WHATSAPP PAIRING CODE IS: ${code}`);
                 console.log("=================================\n");
             } catch (err) {
                 console.error("Pairing code error:", err);
             }
-        }, 4000);
+        }, 5000);
     }
 
     sock.ev.on("connection.update", (update) => {
